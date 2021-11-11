@@ -548,8 +548,8 @@ template <typename _DataType> class SATTileTree {
 };
 
 #ifdef SAT_TILE_TREE_BUILD_PYTHON
-template <typename ValueType> void bind_SATTileTree(py::module &m) {
-    py::class_<SATTileTree<ValueType>>(m, "SATTileTree")
+template <typename ValueType> void bind_SATTileTree(py::module &m, std::string name) {
+    py::class_<SATTileTree<ValueType>>(m, name.c_str())
         .def(py::init<const py::array_t<float> &, unsigned short, bool>(),
              py::arg("volume"), py::arg("tile_size") = 32,
              py::arg("alignment_z_centered") = true)
@@ -560,7 +560,7 @@ template <typename ValueType> void bind_SATTileTree(py::module &m) {
 }
 
 PYBIND11_MODULE(sat_tile_tree, m) {
-    bind_SATTileTree<Eigen::Matrix<float, 1, 1>>(m);
-    bind_SATTileTree<Eigen::Vector2d>(m);
+    bind_SATTileTree<Eigen::Matrix<float, 1, 1>>(m, "SATTileTree");
+    bind_SATTileTree<Eigen::Vector2d>(m, "SATTileTree2D");
 }
 #endif
