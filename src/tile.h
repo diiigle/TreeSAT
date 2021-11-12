@@ -2,8 +2,8 @@
 
 #include "common.h"
 
-template <class _DataType> 
-struct Tile {
+namespace TreeSAT {
+template <class _DataType> struct Tile {
     IMPORT_VALUETYPES(_DataType)
 
     Tile()
@@ -34,30 +34,30 @@ struct Tile {
         m_prev_slice_xz = prev_slice_xz;
         m_tile_size = tile_size;
 
-        for (unsigned int z = 1; z < m_tile_size; ++z) {
+        for (Index z = 1; z < m_tile_size; ++z) {
 #pragma omp parallel for
-            for (unsigned int y = 0; y < m_tile_size; ++y) {
-                for (unsigned int x = 0; x < m_tile_size; ++x) {
+            for (Index y = 0; y < m_tile_size; ++y) {
+                for (Index x = 0; x < m_tile_size; ++x) {
                     set_tile_data_value(x, y, z,
                                         get_tile_data_value(x, y, z) +
                                             get_tile_data_value(x, y, z - 1));
                 }
             }
         }
-        for (unsigned int y = 1; y < m_tile_size; ++y) {
+        for (Index y = 1; y < m_tile_size; ++y) {
 #pragma omp parallel for
-            for (unsigned int z = 0; z < m_tile_size; ++z) {
-                for (unsigned int x = 0; x < m_tile_size; ++x) {
+            for (Index z = 0; z < m_tile_size; ++z) {
+                for (Index x = 0; x < m_tile_size; ++x) {
                     set_tile_data_value(x, y, z,
                                         get_tile_data_value(x, y, z) +
                                             get_tile_data_value(x, y - 1, z));
                 }
             }
         }
-        for (unsigned int x = 1; x < m_tile_size; ++x) {
+        for (Index x = 1; x < m_tile_size; ++x) {
 #pragma omp parallel for
-            for (unsigned int z = 0; z < m_tile_size; ++z) {
-                for (unsigned int y = 0; y < m_tile_size; ++y) {
+            for (Index z = 0; z < m_tile_size; ++z) {
+                for (Index y = 0; y < m_tile_size; ++y) {
                     set_tile_data_value(x, y, z,
                                         get_tile_data_value(x, y, z) +
                                             get_tile_data_value(x - 1, y, z));
@@ -148,3 +148,5 @@ struct Tile {
     DoubleDataType *m_prev_slice_xz; // m_tile_size * m_tile_size
     unsigned short m_tile_size;
 };
+
+} // namespace TreeSAT

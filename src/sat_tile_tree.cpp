@@ -22,6 +22,7 @@ namespace py = pybind11;
 // #define SAT_TILE_TREE_STATS
 #define SAT_TILE_TREE_USE_CACHING
 
+namespace TreeSAT {
 template <typename _DataType> class SATTileTree {
     IMPORT_VALUETYPES(_DataType)
 
@@ -44,8 +45,8 @@ template <typename _DataType> class SATTileTree {
             std::fill(m_data.begin(), m_data.end(), m_emptyCacheFlag);
         }
 
-        inline size_t convertIndex(unsigned int rel_x, unsigned int rel_y,
-                                   unsigned int rel_z) {
+        inline Index convertIndex(unsigned int rel_x, unsigned int rel_y,
+                                  unsigned int rel_z) {
             return rel_z * m_extends[1] * m_extends[0] + rel_y * m_extends[0] +
                    rel_x;
         }
@@ -53,12 +54,12 @@ template <typename _DataType> class SATTileTree {
         /**
          * check for existence and return the value immediately
          */
-        inline bool contains(size_t index, DoubleDataType &value) {
+        inline bool contains(Index index, DoubleDataType &value) {
             value = m_data[index];
             return value != m_emptyCacheFlag;
         }
 
-        inline void insert(size_t index, DoubleDataType value) {
+        inline void insert(Index index, DoubleDataType value) {
             m_data[index] = value;
         }
 
@@ -120,11 +121,7 @@ template <typename _DataType> class SATTileTree {
         } else {
             // handle virtual zeros around
             auto overlap_box = m_dataBBox.overlap(queryBox);
-            // std::cout << "m_dataBBox  " << m_dataBBox.lower << " " <<
-            // m_dataBBox.upper << std::endl; std::cout << "queryBox  " <<
-            // queryBox.lower << " " << queryBox.upper << std::endl; std::cout
-            // << "overlap_box  " << overlap_box.lower << " " <<
-            // overlap_box.upper << std::endl;
+
             if (overlap_box.volume() > 0) {
                 sum = get_sum_from_sat(overlap_box, localCache, rel_offset);
             } else {
@@ -136,7 +133,7 @@ template <typename _DataType> class SATTileTree {
 
     DataType queryAverageSlice(py::slice x_slice, py::slice y_slice,
                                py::slice z_slice) {
-        size_t x1, x2, y1, y2, z1, z2, step, slicelength;
+        Index x1, x2, y1, y2, z1, z2, step, slicelength;
         x_slice.compute(m_dataBBox.upper[0], &x1, &x2, &step, &slicelength);
         y_slice.compute(m_dataBBox.upper[1], &y1, &y2, &step, &slicelength);
         z_slice.compute(m_dataBBox.upper[2], &z1, &z2, &step, &slicelength);
@@ -149,7 +146,7 @@ template <typename _DataType> class SATTileTree {
         return queryAverage(queryBox, &localCache, {0, 0, 0});
     }
 
-    ArrayType get_sat_value_py(size_t x, size_t y, size_t z) {
+    ArrayType get_sat_value_py(Index x, Index y, Index z) {
         auto result = ArrayType({BoundingBox::Scalar(Dimensionality)});
         auto r = result.mutable_unchecked();
         auto value = get_sat_value(x, y, z);
@@ -194,15 +191,11 @@ template <typename _DataType> class SATTileTree {
             (volume_dimensions +
              vec3(m_tile_size - 1, m_tile_size - 1, m_tile_size - 1)) /
             m_tile_size;
-        for (int tile_z = 0; tile_z < tile_tree_dimensions[2]; ++tile_z) {
-            for (int tile_y = 0; tile_y < tile_tree_dimensions[1]; ++tile_y) {
-                for (int tile_x = 0; tile_x < tile_tree_dimensions[0];
+        for (Index tile_z = 0; tile_z < tile_tree_dimensions[2]; ++tile_z) {
+            for (Index tile_y = 0; tile_y < tile_tree_dimensions[1]; ++tile_y) {
+                for (Index tile_x = 0; tile_x < tile_tree_dimensions[0];
                      ++tile_x) {
-                    auto &tile_tensor = m_tiles_tensor(
-                        static_cast<long>(tile_z), static_cast<long>(tile_y),
-                        static_cast<long>(tile_x));
-                    //                    std::cout << tile_tensor.m_type << " "
-                    //                    << tile_tensor.getSize() << std::endl;
+                    auto &tile_tensor = m_tiles_tensor(tile_z, tile_y, tile_x);
                     size += tile_tensor.getSize();
                 }
             }
@@ -235,11 +228,12 @@ template <typename _DataType> class SATTileTree {
         UIntDataType sat_tile_offset;
         bool all_values_equal_flag;
         DataType first_tile_value;
-        int volume_index_offset_x, volume_index_offset_y, volume_index_offset_z;
+        Index volume_index_offset_x, volume_index_offset_y,
+            volume_index_offset_z;
 
-        for (int tile_z = 0; tile_z < tile_tree_dimensions[2]; ++tile_z) {
-            for (int tile_y = 0; tile_y < tile_tree_dimensions[1]; ++tile_y) {
-                for (int tile_x = 0; tile_x < tile_tree_dimensions[0];
+        for (Index tile_z = 0; tile_z < tile_tree_dimensions[2]; ++tile_z) {
+            for (Index tile_y = 0; tile_y < tile_tree_dimensions[1]; ++tile_y) {
+                for (Index tile_x = 0; tile_x < tile_tree_dimensions[0];
                      ++tile_x) {
                     all_values_equal_flag = true;
 
@@ -248,16 +242,15 @@ template <typename _DataType> class SATTileTree {
                     volume_index_offset_z = tile_z * m_tile_size;
 
                     first_tile_value =
-                        data(static_cast<long>(volume_index_offset_z),
-                             static_cast<long>(volume_index_offset_y),
-                             static_cast<long>(volume_index_offset_x));
+                        data(volume_index_offset_z, volume_index_offset_y,
+                             volume_index_offset_x);
 
                     auto tile_data =
                         new DataType[m_tile_size * m_tile_size * m_tile_size];
 
-                    for (int z = 0; z < m_tile_size; ++z) {
-                        for (int y = 0; y < m_tile_size; ++y) {
-                            for (int x = 0; x < m_tile_size; ++x) {
+                    for (Index z = 0; z < m_tile_size; ++z) {
+                        for (Index y = 0; y < m_tile_size; ++y) {
+                            for (Index x = 0; x < m_tile_size; ++x) {
                                 DataType value;
                                 if (z + volume_index_offset_z >=
                                         volume_dimensions[2] ||
@@ -267,32 +260,24 @@ template <typename _DataType> class SATTileTree {
                                         volume_dimensions[0]) {
                                     value = DataType::Zero();
                                 } else {
-                                    value =
-                                        data(static_cast<long>(
-                                                 volume_index_offset_z + z),
-                                             static_cast<long>(
-                                                 volume_index_offset_y + y),
-                                             static_cast<long>(
-                                                 volume_index_offset_x + x));
+                                    value = data(volume_index_offset_z + z,
+                                                 volume_index_offset_y + y,
+                                                 volume_index_offset_x + x);
                                     if (value != first_tile_value) {
                                         all_values_equal_flag = false;
                                     }
                                 }
-                                size_t ptr_offset =
+                                Index ptr_offset =
                                     z * m_tile_size * m_tile_size +
                                     y * m_tile_size + x;
                                 tile_data[ptr_offset] = value;
-                                // std::cout << z << " " << y << " " << x << " "
-                                // << value << std::endl;
                             }
                         }
                     }
 
                     if (tile_x > 0 && tile_y > 0 && tile_z > 0) {
                         sat_tile_offset_double =
-                            m_tiles_tensor(static_cast<long>(tile_z - 1),
-                                           static_cast<long>(tile_y - 1),
-                                           static_cast<long>(tile_x - 1))
+                            m_tiles_tensor(tile_z - 1, tile_y - 1, tile_x - 1)
                                 .get_value(m_tile_size - 1, m_tile_size - 1,
                                            m_tile_size - 1);
                     } else {
@@ -300,8 +285,6 @@ template <typename _DataType> class SATTileTree {
                     }
                     sat_tile_offset =
                         sat_tile_offset_double.template cast<unsigned int>();
-                    // std::cout << "sat tile offset " << sat_tile_offset <<
-                    // std::endl;
 
                     auto prev_slice_xy = new DoubleDataType[(m_tile_size + 1) *
                                                             (m_tile_size + 1)];
@@ -316,12 +299,9 @@ template <typename _DataType> class SATTileTree {
                         sat_tile_offset_double - offset_to_substract;
                     if (tile_z > 0) {
                         auto &tile_tensor =
-                            m_tiles_tensor(static_cast<long>(tile_z - 1),
-                                           static_cast<long>(tile_y),
-                                           static_cast<long>(tile_x));
-                        for (unsigned short y = 1; y < m_tile_size + 1; ++y) {
-                            for (unsigned short x = 1; x < m_tile_size + 1;
-                                 ++x) {
+                            m_tiles_tensor(tile_z - 1, tile_y, tile_x);
+                        for (Index y = 1; y < m_tile_size + 1; ++y) {
+                            for (Index x = 1; x < m_tile_size + 1; ++x) {
                                 prev_slice_xy[y * (m_tile_size + 1) + x] =
                                     tile_tensor.get_value(x - 1, y - 1,
                                                           m_tile_size - 1) -
@@ -330,29 +310,22 @@ template <typename _DataType> class SATTileTree {
                         }
                         if (tile_y > 0) {
                             auto &tile_tensor2 =
-                                m_tiles_tensor(static_cast<long>(tile_z - 1),
-                                               static_cast<long>(tile_y - 1),
-                                               static_cast<long>(tile_x));
-                            for (unsigned short x = 1; x < m_tile_size + 1;
-                                 ++x) {
+                                m_tiles_tensor(tile_z - 1, tile_y - 1, tile_x);
+                            for (Index x = 1; x < m_tile_size + 1; ++x) {
                                 prev_slice_xy[x] = tile_tensor2.get_value(
                                                        x - 1, m_tile_size - 1,
                                                        m_tile_size - 1) -
                                                    offset_to_substract;
                             }
                         } else {
-                            for (unsigned short x = 1; x < m_tile_size + 1;
-                                 ++x) {
+                            for (Index x = 1; x < m_tile_size + 1; ++x) {
                                 prev_slice_xy[x] = DoubleDataType::Zero();
                             }
                         }
                         if (tile_x > 0) {
                             auto &tile_tensor3 =
-                                m_tiles_tensor(static_cast<long>(tile_z - 1),
-                                               static_cast<long>(tile_y),
-                                               static_cast<long>(tile_x - 1));
-                            for (unsigned short y = 1; y < m_tile_size + 1;
-                                 ++y) {
+                                m_tiles_tensor(tile_z - 1, tile_y, tile_x - 1);
+                            for (Index y = 1; y < m_tile_size + 1; ++y) {
                                 prev_slice_xy[y * (m_tile_size + 1)] =
                                     tile_tensor3.get_value(m_tile_size - 1,
                                                            y - 1,
@@ -360,16 +333,14 @@ template <typename _DataType> class SATTileTree {
                                     offset_to_substract;
                             }
                         } else {
-                            for (unsigned short y = 1; y < m_tile_size + 1;
-                                 ++y) {
+                            for (Index y = 1; y < m_tile_size + 1; ++y) {
                                 prev_slice_xy[y * (m_tile_size + 1)] =
                                     DoubleDataType::Zero();
                             }
                         }
                     } else {
-                        for (unsigned short y = 0; y < m_tile_size + 1; ++y) {
-                            for (unsigned short x = 0; x < m_tile_size + 1;
-                                 ++x) {
+                        for (Index y = 0; y < m_tile_size + 1; ++y) {
+                            for (Index x = 0; x < m_tile_size + 1; ++x) {
                                 prev_slice_xy[y * (m_tile_size + 1) + x] =
                                     DoubleDataType::Zero();
                             }
@@ -378,9 +349,7 @@ template <typename _DataType> class SATTileTree {
 
                     if (tile_x > 0) {
                         auto &tile_tensor =
-                            m_tiles_tensor(static_cast<long>(tile_z),
-                                           static_cast<long>(tile_y),
-                                           static_cast<long>(tile_x - 1));
+                            m_tiles_tensor(tile_z, tile_y, tile_x - 1);
                         for (unsigned short z = 0; z < m_tile_size; ++z) {
                             for (unsigned short y = 1; y < m_tile_size + 1;
                                  ++y) {
@@ -392,9 +361,7 @@ template <typename _DataType> class SATTileTree {
                         }
                         if (tile_y > 0) {
                             auto &tile_tensor2 =
-                                m_tiles_tensor(static_cast<long>(tile_z),
-                                               static_cast<long>(tile_y - 1),
-                                               static_cast<long>(tile_x - 1));
+                                m_tiles_tensor(tile_z, tile_y - 1, tile_x - 1);
                             for (unsigned short z = 0; z < m_tile_size; ++z) {
                                 prev_slice_yz[z * (m_tile_size + 1)] =
                                     tile_tensor2.get_value(m_tile_size - 1,
@@ -419,9 +386,7 @@ template <typename _DataType> class SATTileTree {
 
                     if (tile_y > 0) {
                         auto &tile_tensor =
-                            m_tiles_tensor(static_cast<long>(tile_z),
-                                           static_cast<long>(tile_y - 1),
-                                           static_cast<long>(tile_x));
+                            m_tiles_tensor(tile_z, tile_y - 1, tile_x);
                         for (unsigned short z = 0; z < m_tile_size; ++z) {
                             for (unsigned short x = 0; x < m_tile_size; ++x) {
                                 prev_slice_xz[z * m_tile_size + x] =
@@ -441,18 +406,12 @@ template <typename _DataType> class SATTileTree {
 
                     if (all_values_equal_flag) {
                         delete[] tile_data;
-                        // std::cout << "first_tile_value " << first_tile_value
-                        // << std::endl;
-                        m_tiles_tensor(static_cast<long>(tile_z),
-                                       static_cast<long>(tile_y),
-                                       static_cast<long>(tile_x))
+                        m_tiles_tensor(tile_z, tile_y, tile_x)
                             .tile_set_data(m_tile_size, sat_tile_offset,
                                            prev_slice_xy, prev_slice_yz,
                                            prev_slice_xz, first_tile_value);
                     } else {
-                        m_tiles_tensor(static_cast<long>(tile_z),
-                                       static_cast<long>(tile_y),
-                                       static_cast<long>(tile_x))
+                        m_tiles_tensor(tile_z, tile_y, tile_x)
                             .tile_set_data(m_tile_size, sat_tile_offset,
                                            prev_slice_xy, prev_slice_yz,
                                            prev_slice_xz, tile_data);
@@ -462,19 +421,17 @@ template <typename _DataType> class SATTileTree {
         }
     }
 
-    inline DoubleDataType get_sat_value(int x, int y, int z) {
+    inline DoubleDataType get_sat_value(Index x, Index y, Index z) {
         if (x < 0 || y < 0 || z < 0) {
             return DoubleDataType::Zero();
         }
-        return m_tiles_tensor(static_cast<long>(z / m_tile_size),
-                              static_cast<long>(y / m_tile_size),
-                              static_cast<long>(x / m_tile_size))
+        return m_tiles_tensor(z / m_tile_size, y / m_tile_size, x / m_tile_size)
             .get_value(x - x / m_tile_size * m_tile_size,
                        y - y / m_tile_size * m_tile_size,
                        z - z / m_tile_size * m_tile_size);
     }
 
-    inline DoubleDataType get_sat_value(int x, int y, int z,
+    inline DoubleDataType get_sat_value(Index x, Index y, Index z,
                                         QueryCacheType *localCache,
                                         unsigned int rel_x, unsigned int rel_y,
                                         unsigned int rel_z) {
@@ -485,11 +442,10 @@ template <typename _DataType> class SATTileTree {
 #ifdef SAT_TILE_TREE_STATS
         ++__STATS_requests;
 #endif
-        size_t index = localCache->convertIndex(rel_x, rel_y, rel_z);
+        Index index = localCache->convertIndex(rel_x, rel_y, rel_z);
         if (!localCache->contains(index, value)) {
-            value = m_tiles_tensor(static_cast<long>(z / m_tile_size),
-                                   static_cast<long>(y / m_tile_size),
-                                   static_cast<long>(x / m_tile_size))
+            value = m_tiles_tensor(z / m_tile_size, y / m_tile_size,
+                                   x / m_tile_size)
                         .get_value(x - x / m_tile_size * m_tile_size,
                                    y - y / m_tile_size * m_tile_size,
                                    z - z / m_tile_size * m_tile_size);
@@ -510,7 +466,7 @@ template <typename _DataType> class SATTileTree {
     inline DataType get_sum_from_sat(const BoundingBox &queryBox,
                                      QueryCacheType *localCache,
                                      vec3u rel_offset) {
-        int x1, x2, y1, y2, z1, z2;
+        Index x1, x2, y1, y2, z1, z2;
         x1 = queryBox.lower[0] - 1;
         x2 = queryBox.upper[0] - 1;
         y1 = queryBox.lower[1] - 1;
@@ -547,8 +503,12 @@ template <typename _DataType> class SATTileTree {
     }
 };
 
+} // namespace TreeSAT
+
 #ifdef SAT_TILE_TREE_BUILD_PYTHON
-template <typename ValueType> void bind_SATTileTree(py::module &m, std::string name) {
+template <typename ValueType>
+void bind_SATTileTree(py::module &m, std::string name) {
+    using namespace TreeSAT;
     py::class_<SATTileTree<ValueType>>(m, name.c_str())
         .def(py::init<const py::array_t<float> &, unsigned short, bool>(),
              py::arg("volume"), py::arg("tile_size") = 32,

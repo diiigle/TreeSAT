@@ -1,16 +1,8 @@
-//
-// Created by Denis Sumin on 30.11.2019.
-//
-
-#ifndef FABRICATIONENHANCEMENT_BOUNDING_BOX_H
-#define FABRICATIONENHANCEMENT_BOUNDING_BOX_H
-
+#pragma once
 #include <Eigen/Dense>
+#include "common.h"
 
-#endif //FABRICATIONENHANCEMENT_BOUNDING_BOX_H
-
-
-using vec3 = Eigen::Vector3i;
+using vec3 = Eigen::Matrix<TreeSAT::Index, 3, 1>;
 using vec3u = Eigen::Matrix<unsigned int, 3, 1>;
 
 
@@ -45,8 +37,8 @@ MaxIndex(const Vec3T& v)
 
 
 struct BoundingBox {
-    using VolumeType = Eigen::Matrix<int, 3, 1, 0, 3, 1>::Scalar;
-    using Scalar = Eigen::Matrix<int, 3, 1, 0, 3, 1>::Scalar;
+    using VolumeType = vec3::Scalar;
+    using Scalar = vec3::Scalar;
 
     BoundingBox() : lower(0, 0, 0), upper(0, 0, 0) {}
     BoundingBox(vec3 _lower, vec3 _upper) :
