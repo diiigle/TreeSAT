@@ -515,7 +515,7 @@ void bind_SATTileTree(py::module &m, std::string name) {
         .def("size", &SATTileTree<ValueType>::size);
 }
 
-PYBIND11_MODULE(sat_tile_tree, m) {
+PYBIND11_MODULE(TARGET_NAME, m) {
     bind_SATTileTree<Eigen::Matrix<float, 1, 1>>(m, "SATTileTree");
     bind_SATTileTree<Eigen::Vector2d>(m, "SATTileTree2D");
 }

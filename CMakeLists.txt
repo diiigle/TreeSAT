@@ -21,7 +21,7 @@ target_include_directories(Eigen
 find_package(OpenMP)
 #--------------------------------------------------
 
-set(TARGET_NAME sat_tile_tree)
+set(TARGET_NAME ${PROJECT_NAME})
 
 if(${PROJECT_NAME}_BUILD_PYTHON)
     pybind11_add_module(${TARGET_NAME}
@@ -30,6 +30,7 @@ if(${PROJECT_NAME}_BUILD_PYTHON)
     )
 
     set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS SAT_TILE_TREE_BUILD_PYTHON APPEND)
+    set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS TARGET_NAME=${TARGET_NAME} APPEND)
 endif()
 
 target_include_directories(${TARGET_NAME}
