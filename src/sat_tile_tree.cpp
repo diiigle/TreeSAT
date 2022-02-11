@@ -139,9 +139,7 @@ template <typename _DataType> class SATTileTree {
         z_slice.compute(m_dataBBox.upper[2], &z1, &z2, &step, &slicelength);
 
         QueryCacheType localCache({2, 2, 2});
-        BoundingBox queryBox(
-            {static_cast<int>(x1), static_cast<int>(y1), static_cast<int>(z1)},
-            {static_cast<int>(x2), static_cast<int>(y2), static_cast<int>(z2)});
+        BoundingBox queryBox({x1, y1, z1}, {x2, y2, z2});
 
         return queryAverage(queryBox, &localCache, {0, 0, 0});
     }
@@ -162,18 +160,16 @@ template <typename _DataType> class SATTileTree {
                                  BoundingBox::Scalar(Dimensionality)});
         auto r = result.mutable_unchecked();
 
-        for (int z = 0; z < dimensions[2]; ++z) {
+        for (Index z = 0; z < dimensions[2]; ++z) {
 #pragma omp parallel for
-            for (int y = 0; y < dimensions[1]; ++y) {
-                for (int x = 0; x < dimensions[0]; ++x) {
-                    auto &tile =
-                        m_tiles_tensor(static_cast<long>(z / m_tile_size),
-                                       static_cast<long>(y / m_tile_size),
-                                       static_cast<long>(x / m_tile_size));
+            for (Index y = 0; y < dimensions[1]; ++y) {
+                for (Index x = 0; x < dimensions[0]; ++x) {
+                    auto &tile = m_tiles_tensor(
+                        z / m_tile_size, y / m_tile_size, x / m_tile_size);
                     auto value =
-                        tile.get_value(x - x / m_tile_size * m_tile_size,
-                                       y - y / m_tile_size * m_tile_size,
-                                       z - z / m_tile_size * m_tile_size);
+                        tile.get_value(x - (x / m_tile_size) * m_tile_size,
+                                       y - (y / m_tile_size) * m_tile_size,
+                                       z - (z / m_tile_size) * m_tile_size);
                     for (unsigned char c = 0; c < Dimensionality; ++c) {
                         r(z, y, x, c) = value[c];
                     }
@@ -183,8 +179,8 @@ template <typename _DataType> class SATTileTree {
         return result;
     }
 
-    long unsigned int size() const {
-        long unsigned int size = sizeof(SATTileTree);
+    size_t size() const {
+        size_t size = sizeof(SATTileTree);
 
         vec3 volume_dimensions = m_dataBBox.extend();
         vec3 tile_tree_dimensions =
@@ -426,9 +422,9 @@ template <typename _DataType> class SATTileTree {
             return DoubleDataType::Zero();
         }
         return m_tiles_tensor(z / m_tile_size, y / m_tile_size, x / m_tile_size)
-            .get_value(x - x / m_tile_size * m_tile_size,
-                       y - y / m_tile_size * m_tile_size,
-                       z - z / m_tile_size * m_tile_size);
+            .get_value(x - (x / m_tile_size) * m_tile_size,
+                       y - (y / m_tile_size) * m_tile_size,
+                       z - (z / m_tile_size) * m_tile_size);
     }
 
     inline DoubleDataType get_sat_value(Index x, Index y, Index z,
@@ -446,9 +442,9 @@ template <typename _DataType> class SATTileTree {
         if (!localCache->contains(index, value)) {
             value = m_tiles_tensor(z / m_tile_size, y / m_tile_size,
                                    x / m_tile_size)
-                        .get_value(x - x / m_tile_size * m_tile_size,
-                                   y - y / m_tile_size * m_tile_size,
-                                   z - z / m_tile_size * m_tile_size);
+                        .get_value(x - (x / m_tile_size) * m_tile_size,
+                                   y - (y / m_tile_size) * m_tile_size,
+                                   z - (z / m_tile_size) * m_tile_size);
             localCache->insert(index, value);
             // #ifdef SAT_TILE_TREE_STATS
             // if(!insert.second)

@@ -83,9 +83,6 @@ template <class _DataType> struct Tile {
     }
 
     DoubleDataType get_value(size_t x, size_t y, size_t z) const {
-        //            std::cout << "tile type " << m_type << " value " << x << "
-        //            " << y << " " << z << " " << get_tile_data_value(x, y, z)
-        //            << std::endl;
         return get_tile_data_value(x, y, z).template cast<double>() +
                m_prev_slice_xy[0]                       // - Sxy(x1, y1, z1)
                - m_prev_slice_yz[z * (m_tile_size + 1)] // + Syz( x1, y1, z2 )
@@ -113,18 +110,6 @@ template <class _DataType> struct Tile {
         }
     }
 
-    //        std::string toString(unsigned int level) {
-    //            std::ostringstream oss;
-    //            for(unsigned int i = 0; i<level; ++i) oss << "    ";
-    //            oss << value << " ["<<(int)splitplane << "]: "<<split;
-    //            if(!isLeaf()){
-    //                oss << std::endl;
-    //                oss << children[0].toString(level+1) << std::endl;
-    //                oss << children[1].toString(level+1) << std::endl;
-    //            }
-    //            return oss.str();
-    //        }
-    //
     size_t getSize() const {
         size_t size =
             sizeof(m_tile_offset) + 3 * sizeof(DoubleDataType *) +
@@ -133,8 +118,10 @@ template <class _DataType> struct Tile {
                  (m_tile_size + 1) * m_tile_size + m_tile_size * m_tile_size);
 
         if (m_data.index() == 0) { // 0 == DataType <-> sparse case
-            return size + sizeof(DataType);
-        } else { // 1 == DataType* <-> dense case
+            return size +
+                   sizeof(DataType); // TODO FIX, std::variant causes alignment
+                                     // and might be larger than DataType
+        } else {                     // 1 == DataType* <-> dense case
             auto ptr = std::get<DataType *>(m_data);
             return size + sizeof(ptr) +
                    sizeof(DataType) * m_tile_size * m_tile_size * m_tile_size;

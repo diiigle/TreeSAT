@@ -29,7 +29,7 @@ if(${PROJECT_NAME}_BUILD_PYTHON)
         src/sat_tile_tree.cpp
     )
 
-    set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS SAT_TILE_TREE_BUILD_PYTHON)
+    set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS SAT_TILE_TREE_BUILD_PYTHON APPEND)
 endif()
 
 target_include_directories(${TARGET_NAME}

@@ -12,6 +12,6 @@ namespace TreeSAT {
 // signed, compatibility with Eigen
 // see
 // https://eigen.tuxfamily.org/index.php?title=FAQ#Why_Eigen.27s_API_is_using_signed_integers_for_sizes.2C_indices.2C_etc..3F
-using Index = long long int;
+using Index = ssize_t;
 
 } // namespace TreeSAT
