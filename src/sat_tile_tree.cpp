@@ -199,6 +199,11 @@ template <typename _DataType> class SATTileTree {
         return size;
     }
 
+    Eigen::Vector4i shape() const {
+        return Eigen::Vector4i(m_dataBBox.upper[2], m_dataBBox.upper[1],
+                               m_dataBBox.upper[0], Dimensionality);
+    };
+
   private:
     TileTensor m_tiles_tensor;
     BoundingBox m_dataBBox;
@@ -512,7 +517,8 @@ void bind_SATTileTree(py::module &m, std::string name) {
         .def("query_average", &SATTileTree<ValueType>::queryAverageSlice)
         .def("get_sat_value", &SATTileTree<ValueType>::get_sat_value_py)
         .def("get_sat", &SATTileTree<ValueType>::get_sat)
-        .def("size", &SATTileTree<ValueType>::size);
+        .def("size", &SATTileTree<ValueType>::size)
+        .def_property_readonly("shape", &SATTileTree<ValueType>::shape);
 }
 
 PYBIND11_MODULE(TARGET_NAME, m) {
