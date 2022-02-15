@@ -70,7 +70,8 @@ template <typename _DataType> class SATTileTree {
     using ArrayType = py::array_t<typename DataType::Scalar,
                                   py::array::c_style | py::array::forcecast>;
 
-    SATTileTree(const ArrayType &volume, unsigned short tile_size) {
+    SATTileTree(const ArrayType &volume, unsigned short tile_size)
+        : m_tile_size(tile_size) {
         py::buffer_info buffer = volume.request();
 
         if (buffer.ndim != 4)
@@ -82,27 +83,17 @@ template <typename _DataType> class SATTileTree {
                 << "] does not match Dimensionality " << Dimensionality;
             throw std::runtime_error(err.str());
         }
-        SATTileTree(reinterpret_cast<DataType *>(buffer.ptr), buffer.shape[2],
-                    buffer.shape[1], buffer.shape[0], tile_size);
+        initialize(reinterpret_cast<DataType *>(buffer.ptr), buffer.shape[2],
+                   buffer.shape[1], buffer.shape[0]);
     }
 #endif
 
-    SATTileTree(DataType *data, Eigen::Index dimX, Eigen::Index dimY, Eigen::Index dimZ,
-                unsigned short tile_size)
+    SATTileTree(DataType *data, Eigen::Index dimX, Eigen::Index dimY,
+                Eigen::Index dimZ, unsigned short tile_size)
         : m_tile_size(tile_size) {
-
-        auto volume_tensor = TensorType(data, dimZ, dimY, dimX);
-
-        m_dataBBox = BoundingBox({0, 0, 0}, {dimX, dimY, dimZ});
-
-#ifdef SAT_TILE_TREE_STATS
-        __STATS_requests = 0;
-        __STATS_cache_hits = 0;
-        __STATS_cache_collisions = 0;
-#endif // SAT_TILE_TREE_STATS
-
-        constructTree(m_dataBBox, volume_tensor);
+        initialize(data, dimX, dimY, dimZ);
     }
+
     ~SATTileTree() {
 #ifdef SAT_TILE_TREE_STATS
         std::cout << "hits " << __STATS_cache_hits << " requests "
@@ -147,7 +138,7 @@ template <typename _DataType> class SATTileTree {
         return queryAverage(queryBox, &localCache, {0, 0, 0});
     }
 
-    ArrayType get_sat_value_py(Index x, Index y, Index z) {
+    ArrayType querySingularPy(Index x, Index y, Index z) {
         auto result = ArrayType({BoundingBox::Scalar(Dimensionality)});
         auto r = result.mutable_unchecked();
         auto value = get_sat_value(x, y, z);
@@ -157,7 +148,7 @@ template <typename _DataType> class SATTileTree {
         return result;
     }
 
-    ArrayType get_sat() {
+    ArrayType convertDense() {
         vec3 dimensions = m_dataBBox.upper - m_dataBBox.lower;
         auto result = ArrayType({dimensions[2], dimensions[1], dimensions[0],
                                  BoundingBox::Scalar(Dimensionality)});
@@ -217,6 +208,21 @@ template <typename _DataType> class SATTileTree {
     long int __STATS_cache_hits = 0;
     long int __STATS_cache_collisions = 0;
 #endif // SAT_TILE_TREE_STATS
+
+    void initialize(DataType *data, Eigen::Index dimX, Eigen::Index dimY,
+                    Eigen::Index dimZ) {
+        auto volume_tensor = TensorType(data, dimZ, dimY, dimX);
+
+        m_dataBBox = BoundingBox({0, 0, 0}, vec3(dimX, dimY, dimZ));
+
+#ifdef SAT_TILE_TREE_STATS
+        __STATS_requests = 0;
+        __STATS_cache_hits = 0;
+        __STATS_cache_collisions = 0;
+#endif // SAT_TILE_TREE_STATS
+
+        constructTree(m_dataBBox, volume_tensor);
+    }
 
     void constructTree(const BoundingBox &dimensions, const TensorType &data) {
         vec3 volume_dimensions = dimensions.upper - dimensions.lower;
@@ -517,8 +523,8 @@ void bind_SATTileTree(py::module &m, std::string name) {
         .def(py::init<const py::array_t<float> &, unsigned short>(),
              py::arg("volume"), py::arg("tile_size") = 32)
         .def("query_average", &SATTileTree<ValueType>::queryAverageSlice)
-        .def("get_sat_value", &SATTileTree<ValueType>::get_sat_value_py)
-        .def("get_sat", &SATTileTree<ValueType>::get_sat)
+        .def("query_singular", &SATTileTree<ValueType>::querySingularPy)
+        .def("convert_dense", &SATTileTree<ValueType>::convertDense)
         .def("size", &SATTileTree<ValueType>::size)
         .def_property_readonly("shape", &SATTileTree<ValueType>::shape);
 }

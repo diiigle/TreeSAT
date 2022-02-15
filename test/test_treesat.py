@@ -8,7 +8,7 @@ def test_construction():
     input = np.random.rand(5,10,20,1)
     print(input.shape)
     tree = SATTileTree(input)
-    sat = tree.get_sat()
+    sat = tree.convert_dense()
     print(tree.size())
     print(sat.shape, sat)
     assert (tree.shape == input.shape).all()
@@ -16,7 +16,7 @@ def test_construction():
 
 
     assert np.isclose(sat[-1,-1,-1,-1], np.sum(input))
-    assert np.isclose(tree.get_sat_value(tree.shape[2]-1,tree.shape[1]-1,tree.shape[0]-1), sat[-1,-1,-1,-1])
+    assert np.isclose(tree.query_singular(tree.shape[2]-1,tree.shape[1]-1,tree.shape[0]-1), sat[-1,-1,-1,-1])
 
 def test_tile_sizes():
     input = np.random.rand(50,100,200,1)
