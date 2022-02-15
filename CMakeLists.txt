@@ -23,14 +23,18 @@ find_package(OpenMP)
 
 set(TARGET_NAME ${PROJECT_NAME})
 
+set(SOURCE_FILES src/sat_tile_tree.cpp)
+
 if(${PROJECT_NAME}_BUILD_PYTHON)
     pybind11_add_module(${TARGET_NAME}
         MODULE
-        src/sat_tile_tree.cpp
+        ${SOURCE_FILES}
     )
 
     set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS SAT_TILE_TREE_BUILD_PYTHON APPEND)
     set_property(TARGET ${TARGET_NAME} PROPERTY COMPILE_DEFINITIONS TARGET_NAME=${TARGET_NAME} APPEND)
+else()
+    add_library(${TARGET_NAME} SHARED ${SOURCE_FILES})
 endif()
 
 target_include_directories(${TARGET_NAME}

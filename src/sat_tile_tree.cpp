@@ -25,9 +25,6 @@ namespace py = pybind11;
 namespace TreeSAT {
 template <typename _DataType> class SATTileTree {
     IMPORT_VALUETYPES(_DataType)
-
-    using ArrayType = py::array_t<typename DataType::Scalar,
-                                  py::array::c_style | py::array::forcecast>;
     using TensorType =
         Eigen::TensorMap<Eigen::Tensor<DataType, 3, Eigen::RowMajor>>;
     using TileTensor = Eigen::Tensor<Tile<DataType>, 3, Eigen::RowMajor>;
@@ -69,6 +66,10 @@ template <typename _DataType> class SATTileTree {
     };
 
   public:
+#ifdef SAT_TILE_TREE_BUILD_PYTHON
+    using ArrayType = py::array_t<typename DataType::Scalar,
+                                  py::array::c_style | py::array::forcecast>;
+
     SATTileTree(const ArrayType &volume, unsigned short tile_size) {
         py::buffer_info buffer = volume.request();
 
@@ -81,15 +82,18 @@ template <typename _DataType> class SATTileTree {
                 << "] does not match Dimensionality " << Dimensionality;
             throw std::runtime_error(err.str());
         }
+        SATTileTree(reinterpret_cast<DataType *>(buffer.ptr), buffer.shape[2],
+                    buffer.shape[1], buffer.shape[0], tile_size);
+    }
+#endif
 
-        m_tile_size = tile_size;
+    SATTileTree(DataType *data, Eigen::Index dimX, Eigen::Index dimY, Eigen::Index dimZ,
+                unsigned short tile_size)
+        : m_tile_size(tile_size) {
 
-        auto volume_tensor =
-            TensorType(reinterpret_cast<DataType *>(buffer.ptr),
-                       buffer.shape[0], buffer.shape[1], buffer.shape[2]);
+        auto volume_tensor = TensorType(data, dimZ, dimY, dimX);
 
-        m_dataBBox = BoundingBox(
-            {0, 0, 0}, {buffer.shape[2], buffer.shape[1], buffer.shape[0]});
+        m_dataBBox = BoundingBox({0, 0, 0}, {dimX, dimY, dimZ});
 
 #ifdef SAT_TILE_TREE_STATS
         __STATS_requests = 0;
@@ -129,6 +133,7 @@ template <typename _DataType> class SATTileTree {
         return sum / queryBox.volume();
     }
 
+#ifdef SAT_TILE_TREE_BUILD_PYTHON
     DataType queryAverageSlice(py::slice x_slice, py::slice y_slice,
                                py::slice z_slice) {
         Index x1, x2, y1, y2, z1, z2, step, slicelength;
@@ -176,6 +181,7 @@ template <typename _DataType> class SATTileTree {
         }
         return result;
     }
+#endif
 
     size_t size() const {
         size_t size = sizeof(SATTileTree);
