@@ -69,8 +69,7 @@ template <typename _DataType> class SATTileTree {
     };
 
   public:
-    SATTileTree(const ArrayType &volume, unsigned short tile_size,
-                bool alignment_z_centered) {
+    SATTileTree(const ArrayType &volume, unsigned short tile_size) {
         py::buffer_info buffer = volume.request();
 
         if (buffer.ndim != 4)
@@ -92,7 +91,6 @@ template <typename _DataType> class SATTileTree {
         m_dataBBox = BoundingBox(
             {0, 0, 0}, {buffer.shape[2], buffer.shape[1], buffer.shape[0]});
 
-        m_alignment_z_centered = alignment_z_centered;
 #ifdef SAT_TILE_TREE_STATS
         __STATS_requests = 0;
         __STATS_cache_hits = 0;
@@ -208,7 +206,6 @@ template <typename _DataType> class SATTileTree {
     TileTensor m_tiles_tensor;
     BoundingBox m_dataBBox;
     unsigned short m_tile_size;
-    bool m_alignment_z_centered;
 #ifdef SAT_TILE_TREE_STATS
     long int __STATS_requests = 0;
     long int __STATS_cache_hits = 0;
@@ -511,9 +508,8 @@ template <typename ValueType>
 void bind_SATTileTree(py::module &m, std::string name) {
     using namespace TreeSAT;
     py::class_<SATTileTree<ValueType>>(m, name.c_str())
-        .def(py::init<const py::array_t<float> &, unsigned short, bool>(),
-             py::arg("volume"), py::arg("tile_size") = 32,
-             py::arg("alignment_z_centered") = true)
+        .def(py::init<const py::array_t<float> &, unsigned short>(),
+             py::arg("volume"), py::arg("tile_size") = 32)
         .def("query_average", &SATTileTree<ValueType>::queryAverageSlice)
         .def("get_sat_value", &SATTileTree<ValueType>::get_sat_value_py)
         .def("get_sat", &SATTileTree<ValueType>::get_sat)
