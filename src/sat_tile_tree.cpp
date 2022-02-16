@@ -92,6 +92,9 @@ template <typename _DataType> class SATTileTree {
     ArrayType querySingularPy(Index x, Index y, Index z) {
         auto result = ArrayType({BoundingBox::Scalar(Dimensionality)});
         auto r = result.mutable_unchecked();
+        x = std::min(x, m_dataBBox.upper[0] - 1);
+        y = std::min(y, m_dataBBox.upper[1] - 1);
+        z = std::min(z, m_dataBBox.upper[2] - 1);
         auto value = get_sat_value(x, y, z);
         for (unsigned char c = 0; c < Dimensionality; ++c) {
             r(c) = value[c];
@@ -383,9 +386,13 @@ template <typename _DataType> class SATTileTree {
     }
 
     inline DoubleDataType get_sat_value(Index x, Index y, Index z) {
+        // only check lower boundary, upper boundary is expected to be clamped
+        // to m_dataBBox.upper by public API functions
         if (x < 0 || y < 0 || z < 0) {
             return DoubleDataType::Zero();
         }
+        assert(x < m_dataBBox.upper[0] && y < m_dataBBox.upper[1] &&
+               z < m_dataBBox.upper[2]);
         return m_tiles_tensor(z / m_tile_size, y / m_tile_size, x / m_tile_size)
             .get_value(x - (x / m_tile_size) * m_tile_size,
                        y - (y / m_tile_size) * m_tile_size,
