@@ -20,7 +20,6 @@ namespace py = pybind11;
 #include "tile.h"
 
 // #define SAT_TILE_TREE_STATS
-#define SAT_TILE_TREE_USE_CACHING
 
 namespace TreeSAT {
 template <typename _DataType> class SATTileTree {
@@ -28,42 +27,6 @@ template <typename _DataType> class SATTileTree {
     using TensorType =
         Eigen::TensorMap<Eigen::Tensor<DataType, 3, Eigen::RowMajor>>;
     using TileTensor = Eigen::Tensor<Tile<DataType>, 3, Eigen::RowMajor>;
-
-    struct QueryCacheType {
-        QueryCacheType(vec3u extends)
-            : m_extends(extends), m_emptyCacheFlag(DoubleDataType::Constant(
-                                      std::numeric_limits<double>::lowest())) {
-            // allocate and clear at once
-            m_data = std::vector<DoubleDataType>(
-                m_extends[0] * m_extends[1] * m_extends[2], m_emptyCacheFlag);
-        }
-
-        void clear() {
-            std::fill(m_data.begin(), m_data.end(), m_emptyCacheFlag);
-        }
-
-        inline Index convertIndex(unsigned int rel_x, unsigned int rel_y,
-                                  unsigned int rel_z) {
-            return rel_z * m_extends[1] * m_extends[0] + rel_y * m_extends[0] +
-                   rel_x;
-        }
-
-        /**
-         * check for existence and return the value immediately
-         */
-        inline bool contains(Index index, DoubleDataType &value) {
-            value = m_data[index];
-            return value != m_emptyCacheFlag;
-        }
-
-        inline void insert(Index index, DoubleDataType value) {
-            m_data[index] = value;
-        }
-
-        std::vector<DoubleDataType> m_data;
-        DoubleDataType m_emptyCacheFlag;
-        vec3u m_extends;
-    };
 
   public:
 #ifdef SAT_TILE_TREE_BUILD_PYTHON
@@ -94,29 +57,18 @@ template <typename _DataType> class SATTileTree {
         initialize(data, dimX, dimY, dimZ);
     }
 
-    ~SATTileTree() {
-#ifdef SAT_TILE_TREE_STATS
-        std::cout << "hits " << __STATS_cache_hits << " requests "
-                  << __STATS_requests << std::endl;
-        std::cout << "hits "
-                  << double(__STATS_cache_hits) / double(__STATS_requests)
-                  << " collisions "
-                  << double(__STATS_cache_collisions) / double(__STATS_requests)
-                  << std::endl;
-#endif // SAT_TILE_TREE_STATS
-    }
+    ~SATTileTree() {}
 
-    DataType queryAverage(const BoundingBox &queryBox,
-                          QueryCacheType *localCache, vec3u rel_offset) {
+    DataType queryAverage(const BoundingBox &queryBox) {
         DataType sum;
         if (m_dataBBox.contains(queryBox)) {
-            sum = get_sum_from_sat(queryBox, localCache, rel_offset);
+            sum = get_sum_from_sat(queryBox);
         } else {
             // handle virtual zeros around
             auto overlap_box = m_dataBBox.overlap(queryBox);
 
             if (overlap_box.volume() > 0) {
-                sum = get_sum_from_sat(overlap_box, localCache, rel_offset);
+                sum = get_sum_from_sat(overlap_box);
             } else {
                 return DataType::Zero();
             }
@@ -132,10 +84,9 @@ template <typename _DataType> class SATTileTree {
         y_slice.compute(m_dataBBox.upper[1], &y1, &y2, &step, &slicelength);
         z_slice.compute(m_dataBBox.upper[2], &z1, &z2, &step, &slicelength);
 
-        QueryCacheType localCache({2, 2, 2});
         BoundingBox queryBox({x1, y1, z1}, {x2, y2, z2});
 
-        return queryAverage(queryBox, &localCache, {0, 0, 0});
+        return queryAverage(queryBox);
     }
 
     ArrayType querySingularPy(Index x, Index y, Index z) {
@@ -441,41 +392,7 @@ template <typename _DataType> class SATTileTree {
                        z - (z / m_tile_size) * m_tile_size);
     }
 
-    inline DoubleDataType get_sat_value(Index x, Index y, Index z,
-                                        QueryCacheType *localCache,
-                                        unsigned int rel_x, unsigned int rel_y,
-                                        unsigned int rel_z) {
-        if (x < 0 || y < 0 || z < 0) {
-            return DoubleDataType::Zero();
-        }
-        DoubleDataType value;
-#ifdef SAT_TILE_TREE_STATS
-        ++__STATS_requests;
-#endif
-        Index index = localCache->convertIndex(rel_x, rel_y, rel_z);
-        if (!localCache->contains(index, value)) {
-            value = m_tiles_tensor(z / m_tile_size, y / m_tile_size,
-                                   x / m_tile_size)
-                        .get_value(x - (x / m_tile_size) * m_tile_size,
-                                   y - (y / m_tile_size) * m_tile_size,
-                                   z - (z / m_tile_size) * m_tile_size);
-            localCache->insert(index, value);
-            // #ifdef SAT_TILE_TREE_STATS
-            // if(!insert.second)
-            // { ++__STATS_cache_collisions; }
-            // #endif
-        }
-#ifdef SAT_TILE_TREE_STATS
-        else {
-            ++__STATS_cache_hits;
-        }
-#endif
-        return value;
-    }
-
-    inline DataType get_sum_from_sat(const BoundingBox &queryBox,
-                                     QueryCacheType *localCache,
-                                     vec3u rel_offset) {
+    inline DataType get_sum_from_sat(const BoundingBox &queryBox) {
         Index x1, x2, y1, y2, z1, z2;
         x1 = queryBox.lower[0] - 1;
         x2 = queryBox.upper[0] - 1;
@@ -484,31 +401,10 @@ template <typename _DataType> class SATTileTree {
         z1 = queryBox.lower[2] - 1;
         z2 = queryBox.upper[2] - 1;
 
-        return (
-#ifdef SAT_TILE_TREE_USE_CACHING
-                   get_sat_value(x2, y2, z2, localCache, rel_offset[0] + 1,
-                                 rel_offset[1] + 1, rel_offset[2] + 1) -
-                   get_sat_value(x1, y2, z2, localCache, rel_offset[0],
-                                 rel_offset[1] + 1, rel_offset[2] + 1) +
-                   get_sat_value(x2, y1, z1, localCache, rel_offset[0] + 1,
-                                 rel_offset[1], rel_offset[2]) +
-                   get_sat_value(x1, y2, z1, localCache, rel_offset[0],
-                                 rel_offset[1] + 1, rel_offset[2]) -
-                   get_sat_value(x2, y1, z2, localCache, rel_offset[0] + 1,
-                                 rel_offset[1], rel_offset[2] + 1) -
-                   get_sat_value(x2, y2, z1, localCache, rel_offset[0] + 1,
-                                 rel_offset[1] + 1, rel_offset[2]) +
-                   get_sat_value(x1, y1, z2, localCache, rel_offset[0],
-                                 rel_offset[1], rel_offset[2] + 1) -
-                   get_sat_value(x1, y1, z1, localCache, rel_offset[0],
-                                 rel_offset[1], rel_offset[2])
-#else
-                   get_sat_value(x2, y2, z2) - get_sat_value(x1, y2, z2) +
-                   get_sat_value(x2, y1, z1) + get_sat_value(x1, y2, z1) -
-                   get_sat_value(x2, y1, z2) - get_sat_value(x2, y2, z1) +
-                   get_sat_value(x1, y1, z2) - get_sat_value(x1, y1, z1)
-#endif
-                       )
+        return (get_sat_value(x2, y2, z2) - get_sat_value(x1, y2, z2) +
+                get_sat_value(x2, y1, z1) + get_sat_value(x1, y2, z1) -
+                get_sat_value(x2, y1, z2) - get_sat_value(x2, y2, z1) +
+                get_sat_value(x1, y1, z2) - get_sat_value(x1, y1, z1))
             .template cast<typename DataType::Scalar>();
     }
 };
