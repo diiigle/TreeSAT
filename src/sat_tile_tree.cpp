@@ -131,14 +131,10 @@ template <typename _DataType> class SATTileTree {
     size_t size() const {
         size_t size = sizeof(SATTileTree);
 
-        vec3 volume_dimensions = m_dataBBox.extend();
-        vec3 tile_tree_dimensions =
-            (volume_dimensions +
-             vec3(m_tile_size - 1, m_tile_size - 1, m_tile_size - 1)) /
-            m_tile_size;
-        for (Index tile_z = 0; tile_z < tile_tree_dimensions[2]; ++tile_z) {
+        auto &tile_tree_dimensions = m_tiles_tensor.dimensions();
+        for (Index tile_z = 0; tile_z < tile_tree_dimensions[0]; ++tile_z) {
             for (Index tile_y = 0; tile_y < tile_tree_dimensions[1]; ++tile_y) {
-                for (Index tile_x = 0; tile_x < tile_tree_dimensions[0];
+                for (Index tile_x = 0; tile_x < tile_tree_dimensions[2];
                      ++tile_x) {
                     auto &tile_tensor = m_tiles_tensor(tile_z, tile_y, tile_x);
                     size += tile_tensor.getSize();
@@ -152,6 +148,12 @@ template <typename _DataType> class SATTileTree {
         return Eigen::Vector4i(m_dataBBox.upper[2], m_dataBBox.upper[1],
                                m_dataBBox.upper[0], Dimensionality);
     };
+
+    Eigen::Vector3i tileShape() const {
+        auto &tile_tree_dimensions = m_tiles_tensor.dimensions();
+        return Eigen::Vector3i(tile_tree_dimensions[0], tile_tree_dimensions[1],
+                               tile_tree_dimensions[2]);
+    }
 
   private:
     TileTensor m_tiles_tensor;
@@ -429,7 +431,9 @@ void bind_SATTileTree(py::module &m, std::string name) {
         .def("query_singular", &SATTileTree<ValueType>::querySingularPy)
         .def("convert_dense", &SATTileTree<ValueType>::convertDense)
         .def("size", &SATTileTree<ValueType>::size)
-        .def_property_readonly("shape", &SATTileTree<ValueType>::shape);
+        .def_property_readonly("shape", &SATTileTree<ValueType>::shape)
+        .def_property_readonly("tile_shape",
+                               &SATTileTree<ValueType>::tileShape);
 }
 
 PYBIND11_MODULE(TARGET_NAME, m) {
