@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include <variant>
 
 namespace TreeSAT {
 template <class _DataType> struct Tile {
@@ -110,20 +111,21 @@ template <class _DataType> struct Tile {
         }
     }
 
-    size_t getSize() const {
-        size_t size =
+    std::pair<size_t, size_t> getSize() const {
+        size_t overhead =
             sizeof(Tile<DataType>) +
             sizeof(DoubleDataType) *
                 ((m_tile_size + 1) * (m_tile_size + 1) +
                  (m_tile_size + 1) * m_tile_size + m_tile_size * m_tile_size);
+        size_t real_data = 0;
 
         if (isSparse()) {
             // no additional overhead
         } else {
             auto ptr = std::get<DataType *>(m_data);
-            size += sizeof(DataType) * m_tile_size * m_tile_size * m_tile_size;
+            real_data += sizeof(DataType) * m_tile_size * m_tile_size * m_tile_size;
         }
-        return size
+        return std::make_pair(real_data, overhead);
     }
 
     inline bool isSparse() const { return m_data.index() == 0; }

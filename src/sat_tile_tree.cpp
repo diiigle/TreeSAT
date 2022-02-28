@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <iostream>
-#include <variant>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -128,8 +127,9 @@ template <typename _DataType> class SATTileTree {
     }
 #endif
 
-    size_t size() const {
-        size_t size = sizeof(SATTileTree);
+    std::pair<size_t, size_t> size() const {
+        size_t overhead = sizeof(SATTileTree);
+        size_t real_data = 0;
 
         auto &tile_tree_dimensions = m_tiles_tensor.dimensions();
         for (Index tile_z = 0; tile_z < tile_tree_dimensions[0]; ++tile_z) {
@@ -137,11 +137,13 @@ template <typename _DataType> class SATTileTree {
                 for (Index tile_x = 0; tile_x < tile_tree_dimensions[2];
                      ++tile_x) {
                     auto &tile_tensor = m_tiles_tensor(tile_z, tile_y, tile_x);
-                    size += tile_tensor.getSize();
+                    auto tile_memory = tile_tensor.getSize();
+                    real_data += tile_memory.first;
+                    overhead += tile_memory.second;
                 }
             }
         }
-        return size;
+        return std::make_pair(real_data, overhead);
     }
 
     Eigen::Vector4i shape() const {
