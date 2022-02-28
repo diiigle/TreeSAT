@@ -67,9 +67,9 @@ template <class _DataType> struct Tile {
     }
 
     inline DataType get_tile_data_value(size_t x, size_t y, size_t z) const {
-        if (m_data.index() == 0) { // 0 == DataType <-> sparse case
+        if (isSparse()) {
             return std::get<DataType>(m_data) * (x + 1) * (y + 1) * (z + 1);
-        } else { // 1 == DataType* <-> dense case
+        } else {
             size_t ptr_offset =
                 z * m_tile_size * m_tile_size + y * m_tile_size + x;
             return std::get<DataType *>(m_data)[ptr_offset];
@@ -102,9 +102,9 @@ template <class _DataType> struct Tile {
         delete[] m_prev_slice_yz;
         delete[] m_prev_slice_xz;
 
-        if (m_data.index() == 0) { // 0 == DataType <-> sparse case
+        if (isSparse()) {
             // do nothing
-        } else { // 1 == DataType* <-> dense case
+        } else {
             auto data_ptr = std::get<DataType *>(m_data);
             delete[] data_ptr;
         }
@@ -112,21 +112,21 @@ template <class _DataType> struct Tile {
 
     size_t getSize() const {
         size_t size =
-            sizeof(m_tile_offset) + 3 * sizeof(DoubleDataType *) +
+            sizeof(Tile<DataType>) +
             sizeof(DoubleDataType) *
                 ((m_tile_size + 1) * (m_tile_size + 1) +
                  (m_tile_size + 1) * m_tile_size + m_tile_size * m_tile_size);
 
-        if (m_data.index() == 0) { // 0 == DataType <-> sparse case
-            return size +
-                   sizeof(DataType); // TODO FIX, std::variant causes alignment
-                                     // and might be larger than DataType
-        } else {                     // 1 == DataType* <-> dense case
+        if (isSparse()) {
+            // no additional overhead
+        } else {
             auto ptr = std::get<DataType *>(m_data);
-            return size + sizeof(ptr) +
-                   sizeof(DataType) * m_tile_size * m_tile_size * m_tile_size;
+            size += sizeof(DataType) * m_tile_size * m_tile_size * m_tile_size;
         }
+        return size
     }
+
+    inline bool isSparse() const { return m_data.index() == 0; }
 
     std::variant<DataType, DataType *> m_data;
     UIntDataType m_tile_offset;
